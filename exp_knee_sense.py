@@ -1,58 +1,71 @@
 #! /usr/bin/env python
-import sigrec as sr
-import sigrec_mri as mr
+import sigpy as sp
+import mripy as mr
 import matplotlib.pyplot as plt
 import logging
+import numpy as np
 
 logging.basicConfig(level=logging.DEBUG)
 
 # Set parameters
 accel = 8
-max_iter = 50
 lamda = 0.01
 lamda_nlinv = 0
+ksp_calib_width = 24
+mps_ker_width = 12
 
-ksp = sr.io.read_ra('data/knee/ksp.ra')
-ksp /= abs(sr.util.rss(sr.util.ifftc(ksp, axes=(-1, -2)))).max()
-
-# Estimate maps
-ker_shape = [ksp.shape[0], 12, 12]
-calib_shape = [ksp.shape[0], 24, 24]
-ksp_calib = sr.util.crop(ksp, calib_shape)
-img_ker, mps_ker = mr.nlinv_recon(ksp_calib, ker_shape, lamda_nlinv)
-mps = mr.kernels_to_maps(img_ker, mps_ker, ksp.shape)
-
-sr.view.View(mps)
+ksp = sp.io.read_ra('data/knee/ksp.ra')
+ksp /= abs(sp.util.rss(sp.util.ifftc(ksp, axes=(-1, -2)))).max()
+num_coils = ksp.shape[0]
 
 # Simulate undersampling in kspace
-img_shape = mps.shape[1:]
-mask = mr.samp.poisson(img_shape, accel, calib=calib_shape[1:],
+img_shape = ksp.shape[1:]
+mask = mr.samp.poisson(img_shape, accel, calib=[ksp_calib_width, ksp_calib_width],
                        dtype=ksp.dtype)
 
 ksp_under = ksp * mask
 
+# Estimate maps
+mps_ker_shape = [num_coils, mps_ker_width, mps_ker_width]
+ksp_calib_shape = [num_coils, ksp_calib_width, ksp_calib_width]
+
+ksp_calib = sp.util.crop(ksp_under, ksp_calib_shape)
+
+nlinv_app = mr.app.NonlinearInversionRecon(ksp_calib, mps_ker_shape, lamda_nlinv)
+img_ker, mps_ker = nlinv_app.run()
+mps = nlinv_app.kernels_to_maps(img_ker, mps_ker, ksp.shape)
+
+sp.view.View(mps)
+
 # Generate kspace preconditioner
-precond = mr.sense_precond(mps, mask=mask, lamda=lamda)
+precond = mr.precond.sense_kspace_precond(mps, mask=mask)
 
-sr.view.View(precond)
+sp.view.View(precond * mask)
 
-# Perform reconstruction
-img_rec, costs_rec = mr.sense_recon(ksp_under, mps, lamda,
-                                      max_iter=max_iter, output_costs=True)
+# Initialize app
+sense_primal_app = mr.app.SenseRecon(ksp_under, mps, lamda,
+                                     save_iter_obj=True, save_iter_img=True)
+sense_primal_dual_app = mr.app.SensePrimalDualRecon(ksp_under, mps, lamda,
+                                                    save_iter_obj=True, save_iter_img=True)
+sense_precond_app = mr.app.SensePrimalDualRecon(ksp_under, mps, lamda, precond=precond,
+                                                save_iter_obj=True, save_iter_img=True)
 
-img_drec, costs_drec = mr.sense_dual_recon(ksp_under, mps, lamda,
-                                             sigma=0.1, tau=10.0,
-                                             max_iter=max_iter, output_costs=True)
+# Run reconstructions
+sense_primal_app.run()
+sense_primal_dual_app.run()
+sense_precond_app.run()
 
-img_prec, costs_prec = mr.sense_dual_recon(ksp_under, mps, lamda,
-                                             precond=precond,
-                                             sigma=0.1, tau=10.0,
-                                             max_iter=max_iter, output_costs=True)
-
+# Plot
 plt.figure(),
-plt.semilogy(range(max_iter), costs_rec,
-             range(max_iter), costs_drec,
-             range(max_iter), costs_prec)
-plt.legend(['FISTA', 'Primal Dual without Precond.', 'Primal Dual with Precond.'])
-plt.title(r'$\ell 2$ regularized reconstruction')
+plt.semilogy(sense_primal_app.iter_obj)
+plt.semilogy(sense_primal_dual_app.iter_obj)
+plt.semilogy(sense_precond_app.iter_obj)
+plt.legend(['ConjGrad Primal Recon.', 'Primal Dual Recon.', 'Primal Dual Recon. with Precond'])
+plt.ylabel('Objective Value')
+plt.xlabel('Iteration')
+plt.title(r"$\ell 2$ Regularized Reconstruction")
 plt.show()
+
+sp.view.View(np.stack([sense_primal_app.iter_img,
+                       sense_primal_dual_app.iter_img,
+                       sense_precond_app.iter_img]))
