@@ -1,4 +1,6 @@
 #! /usp/bin/env python
+import matplotlib
+matplotlib.use('tkagg')
 import sigpy as sp
 import mripy as mr
 import matplotlib.pyplot as plt
@@ -20,8 +22,11 @@ num_coils = ksp.shape[0]
 
 # Simulate undersampling in kspace
 img_shape = ksp.shape[1:]
-mask = mr.samp.poisson(img_shape, accel, calib=[ksp_calib_width, ksp_calib_width],
-                       dtype=ksp.dtype)
+# mask = mr.samp.poisson(img_shape, accel, calib=[ksp_calib_width, ksp_calib_width],
+#                        dtype=ksp.dtype)
+mask = sp.io.read_ra('mask.ra').astype(ksp.dtype).reshape(ksp.shape[-2:])
+print(mask.shape, ksp.shape)
+sp.view.View(mask)
 
 ksp_under = ksp * mask
 
@@ -31,9 +36,8 @@ ksp_calib_shape = [num_coils, ksp_calib_width, ksp_calib_width]
 
 ksp_calib = sp.util.crop(ksp_under, ksp_calib_shape)
 
-nlinv_app = mr.app.NonlinearInversionRecon(ksp_calib, mps_ker_shape, lamda_nlinv)
-img_ker, mps_ker = nlinv_app.run()
-mps = nlinv_app.kernels_to_maps(img_ker, mps_ker, ksp.shape)
+jsense_app = mr.app.JointSenseRecon(ksp_calib, mps_ker_shape, ksp.shape)
+mps = jsense_app.run()
 
 sp.view.View(mps)
 

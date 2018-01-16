@@ -34,8 +34,8 @@ mps_shape = [ksp.shape[0]] + [int(coord[..., i].max() - coord[..., i].min())
 ksp_calib = sp.util.crop(ksp_under, calib_shape, center=False)
 coord_calib = sp.util.crop(coord_under, calib_shape[1:] + [2], center=False)
 
-nlinv_app = mr.app.NonlinearInversionRecon(ksp_calib, mps_ker_shape, lamda_nlinv,
-                                           coord=coord_calib)
+nlinv_app = mr.app.NonlinearGradRecon(ksp_calib, mps_ker_shape, lamda_nlinv,
+                                      coord=coord_calib)
 img_ker, mps_ker = nlinv_app.run()
 mps = nlinv_app.kernels_to_maps(img_ker, mps_ker, mps_shape)
 
