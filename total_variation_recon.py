@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 import sigpy as sp
 import sigpy.mri as mr
+import sigpy.plot
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
@@ -44,6 +45,7 @@ def total_variation_recon(ksp, lamda, device=-1, coord=None):
     precond_pdhg_app.run()
     
     # Plot
+    sigpy.plot.Image(xp.stack([pdhg_app.img, precond_pdhg_app.img]))
     plt.figure(),
     plt.semilogy(pdhg_app.objective_values)
     plt.semilogy(precond_pdhg_app.objective_values)

@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 import sigpy as sp
 import sigpy.mri as mr
+import sigpy.plot
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
@@ -8,6 +9,8 @@ import argparse
 
 def l1_wavelet_recon(ksp, lamda, device=-1, coord=None):
 
+    device = sp.util.Device(device)
+    xp = device.xp
     # Estimate sensitivity maps
     jsense_app = mr.app.JsenseRecon(ksp, coord=coord, device=device)
     mps = jsense_app.run()
@@ -40,6 +43,7 @@ def l1_wavelet_recon(ksp, lamda, device=-1, coord=None):
     precond_pdhg_app.run()
 
     # Plot
+    sigpy.plot.Image(xp.stack([fista_app.img, pdhg_app.img, precond_pdhg_app.img]))
     plt.figure(),
     plt.semilogy(fista_app.objective_values)
     plt.semilogy(pdhg_app.objective_values)
