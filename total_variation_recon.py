@@ -1,14 +1,13 @@
 #! /usr/bin/env python
 import sigpy as sp
 import sigpy.mri as mr
-import sigpy.plot
+import sigpy.plot as pl
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
 
 
-def total_variation_recon(ksp, lamda, device=-1, coord=None):
-
+def total_variation_recon(ksp, lamda, device=-1, coord=None, max_iter=100):
     device = sp.util.Device(device)
     xp = device.xp
     # Estimate sensitivity maps
@@ -34,10 +33,10 @@ def total_variation_recon(ksp, lamda, device=-1, coord=None):
     sigma = sp.util.vec([sigma1, sigma2])
     # Create apps
     pdhg_app = mr.app.TotalVariationRecon(
-        ksp, mps, lamda=lamda, coord=coord,
+        ksp, mps, lamda=lamda, coord=coord, max_iter=max_iter,
         alg_name='PrimalDualHybridGradient', device=device, save_objective_values=True)
     precond_pdhg_app = mr.app.TotalVariationRecon(
-        ksp, mps, lamda=lamda, coord=coord, sigma=sigma,
+        ksp, mps, lamda=lamda, coord=coord, sigma=sigma, max_iter=max_iter,
         alg_name='PrimalDualHybridGradient', device=device, save_objective_values=True)
 
     # Run recons
@@ -45,10 +44,10 @@ def total_variation_recon(ksp, lamda, device=-1, coord=None):
     precond_pdhg_app.run()
     
     # Plot
-    sigpy.plot.Image(xp.stack([pdhg_app.img, precond_pdhg_app.img]))
+    pl.Image(xp.stack([pdhg_app.img, precond_pdhg_app.img]))
     plt.figure(),
-    plt.semilogy(pdhg_app.objective_values)
-    plt.semilogy(precond_pdhg_app.objective_values)
+    plt.loglog(pdhg_app.objective_values)
+    plt.loglog(precond_pdhg_app.objective_values)
     plt.legend(['Primal Dual Hybrid Gradient',
                 'Primal Dual Hybrid Gradient with Fourier preconditioning'])
     plt.ylabel('Objective Value')
@@ -62,6 +61,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--device', type=int, default=-1)
     parser.add_argument('--lamda', type=float, default=0.001)
+    parser.add_argument('--max_iter', type=int, default=100)
     parser.add_argument('--coord_file', type=str)
     parser.add_argument('ksp_file', type=str)
     args = parser.parse_args()
@@ -72,4 +72,4 @@ if __name__ == '__main__':
     else:
         coord = None
 
-    total_variation_recon(ksp, args.lamda, coord=coord, device=args.device)
+    total_variation_recon(ksp, args.lamda, coord=coord, device=args.device, max_iter=args.max_iter)
