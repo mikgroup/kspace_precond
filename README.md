@@ -1,6 +1,6 @@
-# fourier_precond
+# k-space Preconditioning
 
-This repo contains scripts to produce experients with fourier preconditioning.
+This repo contains scripts to produce experients with k-space preconditioning.
 
 ## Requirements
 
