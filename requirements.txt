@@ -1,2 +1,2 @@
-sigpy==0.1.14
+sigpy==0.1.21
 matplotlib
